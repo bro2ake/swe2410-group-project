@@ -1,5 +1,8 @@
 import sqlite3
-
+'''
+databaseConnect is used as an access point for the SQLite database we have chosen to use
+The functionality of this will be adding users, adding passwords, and retrieving hashes
+'''
 class DatabaseManager:
     def __init__(self, db_name="user_data.db"):
         self.db_name = db_name
