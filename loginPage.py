@@ -12,7 +12,10 @@ class LoginPage:
     def login(self, username, password):
         stored_password_hash = self.db.get_hash(username)
 
+        # Query the database for the stored hash of the provided username
         if stored_password_hash is None:
             return False
+
+        # Verify the provided password against the stored hash
 
         return verify_native(password, stored_password_hash)
