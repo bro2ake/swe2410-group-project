@@ -35,3 +35,14 @@ class CreateAccount:
         # Generate secure hash using encryptionEngine and store in database
         password_hash = generate_hash(password)
         return self.db.add_user(username, password_hash)
+
+if __name__ == "__main__":
+    account_creator = CreateAccount()
+    print("=== Create Account ===")
+    username_input = input("Email (Username): ")
+    password_input = input("Password: ")
+    
+    if account_creator.create_account(username_input, password_input):
+        print("Account created successfully!")
+    else:
+        print("Account creation failed. Ensure the email is valid, the password is at least 14 characters long with uppercase, lowercase, and digits, and the username doesn't already exist.")
