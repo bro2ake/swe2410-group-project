@@ -18,16 +18,18 @@ class PasswordManager:
 
     def view_entries(self):
         entries = self.db.get_password_entries(self.username)
+        return entries
+
+    def _print_entries(self, entries):
         if not entries:
             print("No saved passwords found.")
-            return []
-        
+            return
+
         print("\n--- Saved Passwords ---")
         for entry in entries:
             entry_id, service, entry_user, entry_pass = entry
             print(f"ID: {entry_id} | Service: {service} | Username: {entry_user} | Password: {entry_pass}")
         print("-----------------------")
-        return entries
 
     def update_entry(self, entry_id, new_service, new_username, new_password):
         if self.db.update_password_entry(entry_id, self.username, new_service, new_username, new_password):
@@ -52,7 +54,8 @@ class PasswordManager:
             choice = input("Select an option (1-5): ")
             
             if choice == '1':
-                self.view_entries()
+                entries = self.view_entries()
+                self._print_entries(entries)
             elif choice == '2':
                 service = input("Service/Website: ")
                 username = input("Username/Email: ")
@@ -64,16 +67,20 @@ class PasswordManager:
                     
                 self.create_entry(service, username, password)
             elif choice == '3':
-                self.view_entries()
-                entry_id = input("Enter the ID of the entry to edit: ")
-                service = input("New Service/Website: ")
-                username = input("New Username/Email: ")
-                password = input("New Password: ")
-                self.update_entry(entry_id, service, username, password)
+                entries = self.view_entries()
+                self._print_entries(entries)
+                if entries:
+                    entry_id = input("Enter the ID of the entry to edit: ")
+                    service = input("New Service/Website: ")
+                    username = input("New Username/Email: ")
+                    password = input("New Password: ")
+                    self.update_entry(entry_id, service, username, password)
             elif choice == '4':
-                self.view_entries()
-                entry_id = input("Enter the ID of the entry to delete: ")
-                self.delete_entry(entry_id)
+                entries = self.view_entries()
+                self._print_entries(entries)
+                if entries:
+                    entry_id = input("Enter the ID of the entry to delete: ")
+                    self.delete_entry(entry_id)
             elif choice == '5':
                 print("Logging out...")
                 break
