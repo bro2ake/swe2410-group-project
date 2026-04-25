@@ -2,6 +2,7 @@ from databaseConnect import DatabaseManager
 from encryptionEngine import verify_native
 from createAccount import CreateAccount
 from passwordManager import PasswordManager
+import passwordGenerator
 
 '''
 Handles login functionality, verifies user credentials against stored hashes in the database.
@@ -48,6 +49,8 @@ if __name__ == "__main__":
             print("\n=== Create Account ===")
             username_input = input("Email (Username): ")
             password_input = input("Password: ")
+
+            
             
             if account_creator.create_account(username_input, password_input):
                 print("Account created successfully!")
