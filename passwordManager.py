@@ -42,6 +42,31 @@ class PasswordManager:
             print(f"Successfully deleted entry ID {entry_id}.")
             return True
         return False
+    
+    # Valut health menu 
+    def vault_health(self):
+        entries = self.view_entries()
+
+        if not entries:
+            return {
+                "total_entries": 0,
+                "weak_passwords": 0,
+                "reused_passwords": 0
+            }
+
+        passwords = [entry[3] for entry in entries]
+        reused_count = len(passwords) - len(set(passwords))
+
+        weak_pass_count = 0
+        for password in passwords:
+            if passwordGenerator.passwordStrength(password) == "❌ Weak":
+                weak_pass_count += 1
+
+        return {
+            "total_entries": len(entries),
+            "weak_passwords": weak_pass_count,
+            "reused_passwords": reused_count
+        }
 
     def vault_menu(self):
         while True:
@@ -50,8 +75,9 @@ class PasswordManager:
             print("2. Add Password")
             print("3. Edit Password")
             print("4. Delete Password")
-            print("5. Logout")
-            choice = input("Select an option (1-5): ")
+            print("5. Vault Health")
+            print("6. Logout")
+            choice = input("Select an option (1-6): ")
             
             if choice == '1':
                 entries = self.view_entries()
@@ -62,9 +88,20 @@ class PasswordManager:
                 password = input("Password (leave blank to auto-generate): ")
                 
                 if not password:
-                    password = passwordGenerator.genRandomPassword()
+                    length = input("Enter desired password length (default 16): ")
+                    use_symbols = input("Include symbols? (y/n): ").lower()
+
+                    if not length:
+                        length = 16
+                    else:
+                        length = int(length)
+
+                    symbols_enabled = (use_symbols == 'y')
+
+                    password = passwordGenerator.genRandomPassword(length=length, use_symbols=symbols_enabled)
                     print(f"Generated Password: {password}")
-                    
+
+                print("Password Strength:", passwordGenerator.passwordStrength(password))    
                 self.create_entry(service, username, password)
             elif choice == '3':
                 entries = self.view_entries()
@@ -82,6 +119,12 @@ class PasswordManager:
                     entry_id = input("Enter the ID of the entry to delete: ")
                     self.delete_entry(entry_id)
             elif choice == '5':
+                health = self.vault_health()
+                print("\n--- Vault Health ---")
+                print("Total Entries:", health["total_entries"])
+                print("Weak Passwords:", health["weak_passwords"])
+                print("Reused Passwords:", health["reused_passwords"])
+            elif choice == '6':
                 print("Logging out...")
                 break
             else:
