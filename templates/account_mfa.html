@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}MFA settings - Password Manager{% endblock %}
+
+{% block content %}
+<div class="dashboard-body">
+    <div class="navbar">
+        <div class="navbar-brand">🔐 Password Manager</div>
+        <div class="navbar-right">
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary btn-small">Back to vault</a>
+            <a href="{{ url_for('logout') }}" class="btn btn-logout btn-small">Logout</a>
+        </div>
+    </div>
+
+    <div class="container" style="max-width: 560px; margin: 0 auto; padding: 2rem 1.5rem;">
+        <h1 class="card-title mb-3">Two-factor authentication (TOTP)</h1>
+        <p class="text-muted mb-3">Use an authenticator app (Google Authenticator, Authy, 1Password, etc.) and PyOTP (RFC 6238) on the server.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'success' if category == 'success' else 'error' if category == 'error' else 'warning' if category == 'warning' else 'info' }}">
+                        <span>{{ message }}</span>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% if mfa_enabled %}
+        <div class="card" style="background: #c6f6d5; border: 1px solid #9ae6b4; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+            <p style="font-weight: 600; color: #22543d;">MFA is <strong>enabled</strong> for this account. You will be asked for a code after your password on login.</p>
+        </div>
+        <form method="POST" action="{{ url_for('account_mfa_disable') }}" onsubmit="return confirm('Turn off two-factor? You can set it up again later.');">
+            <button type="submit" class="btn" style="background: #e53e3e; color: white;">Disable MFA</button>
+        </form>
+        {% else %}
+            {% if enrollment_secret %}
+            <p class="mb-2">1. Scan this QR with your authenticator app, or enter the setup key manually.</p>
+            <div class="text-center mb-2">
+                <img src="{{ qr_data_uri }}" alt="MFA QR code" style="max-width: 220px; height: auto; border: 1px solid #e2e8f0; padding: 8px; border-radius: 8px;">
+            </div>
+            <p class="text-muted" style="font-size: 0.875rem; word-break: break-all;">Setup key: <code>{{ enrollment_secret }}</code></p>
+            <p class="mb-2 mt-3">2. Enter a 6-digit code from the app to confirm.</p>
+            <form method="POST" action="{{ url_for('account_mfa_confirm') }}">
+                <div class="form-group">
+                    <label for="code">Confirmation code</label>
+                    <input type="text" id="code" name="code" inputmode="numeric" required placeholder="000000" maxlength="8">
+                </div>
+                <button type="submit" class="btn btn-primary">Confirm and enable MFA</button>
+            </form>
+            <form method="POST" action="{{ url_for('account_mfa_cancel_setup') }}" class="mt-2">
+                <button type="submit" class="link" style="background: none; border: none; color: #667eea; cursor: pointer; padding: 0;">Cancel setup</button>
+            </form>
+            {% else %}
+            <p class="mb-3">MFA is off. Set it up to require an authenticator code after your password.</p>
+            <form method="POST" action="{{ url_for('account_mfa_start') }}">
+                <button type="submit" class="btn btn-primary">Set up authenticator (QR)</button>
+            </form>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -305,6 +305,7 @@
     <div class="navbar">
         <div class="navbar-brand">🔐 Password Manager</div>
         <div class="navbar-right">
+            <a href="{{ url_for('account_mfa') }}" class="btn btn-secondary btn-small" title="Two-factor auth">MFA</a>
             <span class="navbar-user">👤 {{ username }}</span>
             <a href="{{ url_for('logout') }}" class="btn btn-logout btn-small">Logout</a>
         </div>
@@ -447,6 +448,8 @@
                                     <span class="entry-group">{{ (entry[5] or 'other')|replace('_', ' ')|capitalize }}</span>
                                 </div>
                                 <div class="entry-actions">
+                                    <button type="button" onclick="copyToClipboard({{ entry[2] | tojson }}, this)" class="btn btn-small btn-small-action" style="background: #805ad5; color: white; border: none; cursor: pointer;" title="Copy username to clipboard (browser)">Copy user</button>
+                                    <button type="button" onclick="copyPasswordToClipboard({{ entry[0] }}, this)" class="btn btn-small btn-small-action" style="background: #38a169; color: white; border: none; cursor: pointer;" title="Copy password to clipboard (browser)">Copy pass</button>
                                     <button onclick="revealPassword({{ entry[0] }}, this)" class="btn btn-small btn-small-action" style="background: #667eea; color: white; border: none; cursor: pointer;">Reveal</button>
                                     <button onclick="editEntry({{ entry[0] }}, {{ entry[1] | tojson }}, {{ entry[2] | tojson }}, {{ entry[3] | tojson }}, {{ entry[4] | tojson }}, {{ (entry[5] or 'other') | tojson }})" class="btn btn-small btn-small-action" style="background: #4299e1; color: white; border: none; cursor: pointer;">✏️ Edit</button>
                                     <button onclick="deleteEntry({{ entry[0] }}, '{{ entry[1] }}')" class="btn btn-small btn-small-action" style="background: #f56565; color: white; border: none; cursor: pointer;">🗑️ Delete</button>
@@ -578,6 +581,29 @@
             passwordField.textContent = passwordField.dataset.password;
             button.textContent = 'Hide';
         }
+    }
+
+    function copyToClipboard(text, button) {
+        if (text == null || text === '') return;
+        if (!navigator.clipboard || !navigator.clipboard.writeText) {
+            window.prompt('Copy this text:', text);
+            return;
+        }
+        const prev = button.textContent;
+        navigator.clipboard.writeText(String(text))
+            .then(() => {
+                button.textContent = 'Copied';
+                setTimeout(() => { button.textContent = prev; }, 1600);
+            })
+            .catch(() => { window.prompt('Copy this text:', text); });
+    }
+
+    function copyPasswordToClipboard(entryId, button) {
+        const card = document.querySelector(`[data-entry-id="${entryId}"]`);
+        if (!card) return;
+        const passwordField = card.querySelector('.password-masked');
+        const v = passwordField && passwordField.dataset.password;
+        copyToClipboard(v, button);
     }
 
     // Generate password

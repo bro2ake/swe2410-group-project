@@ -13,7 +13,9 @@ class DatabaseManager:
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY,
             username TEXT UNIQUE,
-            passwordHash TEXT
+            passwordHash TEXT,
+            mfa_enabled INTEGER DEFAULT 0,
+            totp_secret TEXT
         )
         """
         self._execute_query(query_users)
@@ -51,6 +53,15 @@ class DatabaseManager:
         except sqlite3.OperationalError:
             pass  # Column already exists, nothing to do
 
+        try:
+            self._execute_query("ALTER TABLE users ADD COLUMN mfa_enabled INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            self._execute_query("ALTER TABLE users ADD COLUMN totp_secret TEXT")
+        except sqlite3.OperationalError:
+            pass
+
     def _execute_query(self, query, params=()):
         cursor = self.conn.cursor()
         cursor.execute(query, params)
@@ -64,7 +75,32 @@ class DatabaseManager:
             return True
         except sqlite3.IntegrityError:
             return False
-    
+
+    def get_mfa_state(self, username):
+        """Returns (mfa_enabled: 0/1, totp_secret: str|None)."""
+        query = "SELECT mfa_enabled, totp_secret FROM users WHERE username = ?"
+        cursor = self._execute_query(query, (username,))
+        row = cursor.fetchone()
+        if not row:
+            return (0, None)
+        return (int(row[0] or 0), row[1])
+
+    def set_totp_secret(self, username, totp_secret):
+        query = "UPDATE users SET totp_secret = ? WHERE username = ?"
+        self._execute_query(query, (totp_secret, username))
+        return True
+
+    def set_mfa_enabled(self, username, enabled):
+        v = 1 if enabled else 0
+        query = "UPDATE users SET mfa_enabled = ? WHERE username = ?"
+        self._execute_query(query, (v, username))
+        return True
+
+    def clear_mfa(self, username):
+        query = "UPDATE users SET mfa_enabled = 0, totp_secret = NULL WHERE username = ?"
+        self._execute_query(query, (username,))
+        return True
+
     def get_hash(self, username):
         query = "SELECT passwordHash FROM users WHERE username = ?"
         cursor = self._execute_query(query, (username,))

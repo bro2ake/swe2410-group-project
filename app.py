@@ -9,7 +9,12 @@ from loginPage import LoginPage
 from createAccount import CreateAccount
 from passwordManager import PasswordManager
 from passwordGenerator import genRandomPassword, passwordStrength
+from databaseConnect import DatabaseManager
 import os
+import base64
+import io
+import pyotp
+import qrcode
 from functools import wraps
 
 app = Flask(__name__)
@@ -19,6 +24,42 @@ app.secret_key = os.urandom(24)  # Generate random secret key for sessions
 VALID_ENTRY_TYPES = ["password", "api_key"]
 # Work / Personal / Social organization
 VALID_GROUPS = ["work", "personal", "social", "other"]
+
+TOTP_ISSUER = "PasswordManager"
+
+
+def _totp_provisioning_uri(secret, account_name):
+    return pyotp.TOTP(secret).provisioning_uri(name=account_name, issuer_name=TOTP_ISSUER)
+
+
+def _make_qr_data_uri(provisioning_uri):
+    buf = io.BytesIO()
+    img = qrcode.make(provisioning_uri)
+    img.save(buf, format="PNG")
+    b64 = base64.b64encode(buf.getvalue()).decode()
+    return f"data:image/png;base64,{b64}"
+
+
+def _finalize_session_login(username):
+    session["logged_in"] = True
+    session["username"] = username
+    session.pop("mfa_pending_user", None)
+
+
+def _password_login_result(username, password):
+    """
+    After primary password check: 'success' and username, or 'mfa', or 'error' and message.
+    """
+    if not username or not password:
+        return "error", "Username and password required."
+    login_page = LoginPage()
+    if not login_page.login(username, password):
+        return "error", "Invalid username or password."
+    db = DatabaseManager()
+    mfa_en, totp_secret = db.get_mfa_state(username)
+    if mfa_en and totp_secret:
+        return "mfa", username
+    return "success", username
 
 
 # ============================================================================
@@ -34,20 +75,6 @@ def login_required(f):
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
-
-
-def handle_login(username, password):
-    """Authenticate user by calling LoginPage.login() backend function."""
-    if not username or not password:
-        return False, "Username and password required."
-
-    login_page = LoginPage()
-    if login_page.login(username, password):
-        session['logged_in'] = True
-        session['username'] = username
-        return True, f"Welcome, {username}!"
-    else:
-        return False, "Invalid username or password."
 
 
 def handle_register(email, password, confirm_password):
@@ -79,28 +106,64 @@ def handle_register(email, password, confirm_password):
 
 @app.route('/')
 def index():
-    """Redirect to dashboard if logged in, otherwise to login."""
-    if 'logged_in' in session and session['logged_in']:
+    """Redirect to dashboard if logged in, MFA step, or login."""
+    if 'logged_in' in session and session.get('logged_in'):
         return redirect(url_for('dashboard'))
+    if session.get('mfa_pending_user') and not session.get('logged_in'):
+        return redirect(url_for('mfa_verify'))
     return redirect(url_for('login'))
 
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    """Login page and handler."""
+    """Login: password first; MFA users go to mfa_verify."""
+    if request.method == 'GET' and session.get('mfa_pending_user'):
+        return redirect(url_for('mfa_verify'))
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '').strip()
-        
-        success, message = handle_login(username, password)
-        
-        if success:
-            flash(message, 'success')
-            return redirect(url_for('dashboard'))
+        result, payload = _password_login_result(username, password)
+        if result == 'error':
+            flash(payload, 'error')
+        elif result == 'mfa':
+            session['mfa_pending_user'] = payload
+            return redirect(url_for('mfa_verify'))
         else:
-            flash(message, 'error')
-    
+            _finalize_session_login(payload)
+            flash(f"Welcome, {payload}!", 'success')
+            return redirect(url_for('dashboard'))
     return render_template('login.html')
+
+
+@app.route('/login/mfa', methods=['GET', 'POST'])
+def mfa_verify():
+    """Second factor after password (TOTP via PyOTP)."""
+    pending = session.get('mfa_pending_user')
+    if not pending:
+        flash('Log in with your password first.', 'warning')
+        return redirect(url_for('login'))
+    db = DatabaseManager()
+    mfa_en, totp_secret = db.get_mfa_state(pending)
+    if not mfa_en or not totp_secret:
+        session.pop('mfa_pending_user', None)
+        flash('MFA is not set up for this account. Try again.', 'error')
+        return redirect(url_for('login'))
+    if request.method == 'POST':
+        raw = request.form.get('code', '') or ''
+        code = raw.replace(' ', '').strip()
+        if pyotp.TOTP(totp_secret).verify(code, valid_window=1):
+            _finalize_session_login(pending)
+            flash('Signed in with authenticator. Welcome!', 'success')
+            return redirect(url_for('dashboard'))
+        flash('Invalid or expired code. Try again.', 'error')
+    return render_template('mfa.html', username=pending)
+
+
+@app.route('/login/cancel-mfa', methods=['GET', 'POST'])
+def login_cancel_mfa():
+    session.pop('mfa_pending_user', None)
+    flash('Login cancelled. Enter your password again if you want to sign in.', 'info')
+    return redirect(url_for('login'))
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -128,6 +191,87 @@ def logout():
     session.clear()
     flash('Logged out successfully.', 'success')
     return redirect(url_for('login'))
+
+
+# ============================================================================
+# MFA settings (TOTP / PyOTP) — after login
+# ============================================================================
+
+@app.route('/account/mfa', methods=['GET'])
+@login_required
+def account_mfa():
+    username = session.get('username')
+    db = DatabaseManager()
+    mfa_en, secret = db.get_mfa_state(username)
+    mfa_on = bool(mfa_en)
+    enrollment_secret = None
+    qr_data_uri = None
+    if not mfa_on and secret:
+        enrollment_secret = secret
+        uri = _totp_provisioning_uri(secret, username)
+        qr_data_uri = _make_qr_data_uri(uri)
+    return render_template(
+        'account_mfa.html',
+        mfa_enabled=mfa_on,
+        enrollment_secret=enrollment_secret,
+        qr_data_uri=qr_data_uri,
+    )
+
+
+@app.route('/account/mfa/start', methods=['POST'])
+@login_required
+def account_mfa_start():
+    username = session.get('username')
+    db = DatabaseManager()
+    mfa_en, sec = db.get_mfa_state(username)
+    if mfa_en:
+        flash('MFA is already enabled.', 'info')
+        return redirect(url_for('account_mfa'))
+    if sec:
+        flash('You already have a setup in progress. Scan the QR or cancel below.', 'info')
+        return redirect(url_for('account_mfa'))
+    new_secret = pyotp.random_base32()
+    db.set_totp_secret(username, new_secret)
+    flash('Scan the QR with your app, then enter a code to enable MFA.', 'success')
+    return redirect(url_for('account_mfa'))
+
+
+@app.route('/account/mfa/confirm', methods=['POST'])
+@login_required
+def account_mfa_confirm():
+    username = session.get('username')
+    code = (request.form.get('code') or '').replace(' ', '').strip()
+    db = DatabaseManager()
+    mfa_en, totp_secret = db.get_mfa_state(username)
+    if mfa_en:
+        return redirect(url_for('account_mfa'))
+    if not totp_secret:
+        flash('Start setup first.', 'error')
+        return redirect(url_for('account_mfa'))
+    if not code or not pyotp.TOTP(totp_secret).verify(code, valid_window=1):
+        flash('Invalid code. Check your app clock and try again.', 'error')
+        return redirect(url_for('account_mfa'))
+    db.set_mfa_enabled(username, True)
+    flash('Two-factor authentication is now enabled.', 'success')
+    return redirect(url_for('account_mfa'))
+
+
+@app.route('/account/mfa/cancel-setup', methods=['POST'])
+@login_required
+def account_mfa_cancel_setup():
+    username = session.get('username')
+    DatabaseManager().clear_mfa(username)
+    flash('Authenticator setup cancelled.', 'info')
+    return redirect(url_for('account_mfa'))
+
+
+@app.route('/account/mfa/disable', methods=['POST'])
+@login_required
+def account_mfa_disable():
+    username = session.get('username')
+    DatabaseManager().clear_mfa(username)
+    flash('Two-factor authentication has been turned off.', 'success')
+    return redirect(url_for('account_mfa'))
 
 
 # ============================================================================
