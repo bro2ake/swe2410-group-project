@@ -30,18 +30,20 @@ class DatabaseManager:
         )
         """
         self._execute_query(query_passwords)
+        
+        # Migrate existing databases to add entry_type column if missing
+        self._migrate_table()
 
-        # README! Might need to add this to sync to the db
-        #def _migrate_table(self):
-        #'''
-        #Adds the entry_type column to existing databases that were created
-        #before this column existed. Safe to run on new databases too —
-       # the exception is silently ignored if the column is already present.
-       # '''
-        #try:
-            #self._execute_query("ALTER TABLE passwords ADD COLUMN entry_type TEXT DEFAULT 'password'")
-        #except sqlite3.OperationalError:
-            #pass  # Column already exists, nothing to do
+    def _migrate_table(self):
+        '''
+        Adds the entry_type column to existing databases that were created
+        before this column existed. Safe to run on new databases too —
+        the exception is silently ignored if the column is already present.
+        '''
+        try:
+            self._execute_query("ALTER TABLE passwords ADD COLUMN entry_type TEXT DEFAULT 'password'")
+        except sqlite3.OperationalError:
+            pass  # Column already exists, nothing to do
         
     def _execute_query(self, query, params=()):
         cursor = self.conn.cursor()
@@ -73,9 +75,9 @@ class DatabaseManager:
         cursor = self._execute_query(query, (owner_username,))
         return cursor.fetchall()
 
-    def update_password_entry(self, entry_id, owner_username, service, username, password, entry_type=None): #If the user does not change the entry type it stays as password
-        query = "UPDATE passwords SET service = ?, username = ?, password = ? WHERE id = ? AND owner_username = ?"
-        self._execute_query(query, (service, username, password, entry_id, owner_username))
+    def update_password_entry(self, entry_id, owner_username, service, username, password, entry_type="password"):
+        query = "UPDATE passwords SET service = ?, username = ?, password = ?, entry_type = ? WHERE id = ? AND owner_username = ?"
+        self._execute_query(query, (service, username, password, entry_type, entry_id, owner_username))
         return True
 
     def delete_password_entry(self, entry_id, owner_username):

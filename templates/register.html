@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Register - Password Manager{% endblock %}
+
+{% block content %}
+<div style="display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; padding: 20px;">
+    <div class="card" style="max-width: 400px; width: 100%;">
+        <div class="text-center mb-3">
+            <h1 style="font-size: 3rem; margin-bottom: 0.5rem;">📝</h1>
+            <h2 class="card-title">Create Account</h2>
+            <p class="text-muted">Set up your Password Manager</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'success' if category == 'success' else 'error' if category == 'error' else 'warning' if category == 'warning' else 'info' }}">
+                        <span>{{ message }}</span>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required autofocus placeholder="Enter your email">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required placeholder="Create a strong password">
+                <small class="text-muted" style="display: block; margin-top: 0.5rem;">Requirements: At least 8 characters, uppercase, lowercase, number, symbol</small>
+            </div>
+
+            <div class="form-group">
+                <label for="confirm_password">Confirm Password</label>
+                <input type="password" id="confirm_password" name="confirm_password" required placeholder="Re-enter your password">
+            </div>
+
+            <button type="submit" class="btn btn-secondary" style="width: 100%; padding: 12px;">Create Account</button>
+        </form>
+
+        <p class="text-center mt-3">
+            Already have an account? <a href="{{ url_for('login') }}" class="link">Login here</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

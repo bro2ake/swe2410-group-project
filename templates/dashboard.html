@@ -1,0 +1,587 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Password Manager{% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        background: #f5f5f5;
+    }
+
+    .dashboard-body {
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+    }
+
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .metric-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        border-left: 4px solid #667eea;
+    }
+
+    .metric-value {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #2d3748;
+    }
+
+    .metric-label {
+        font-size: 0.875rem;
+        color: #718096;
+        margin-top: 0.5rem;
+    }
+
+    .metric-warning {
+        border-left-color: #f6ad55;
+    }
+
+    .search-section {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .search-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+
+    .expandable-section {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .expandable-header {
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 600;
+        color: #2d3748;
+        user-select: none;
+    }
+
+    .expandable-header:hover {
+        color: #667eea;
+    }
+
+    .expandable-content {
+        display: none;
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .expandable-content.active {
+        display: block;
+    }
+
+    .entry-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        border-left: 4px solid #cbd5e0;
+    }
+
+    .entry-card.api-key {
+        border-left-color: #667eea;
+    }
+
+    .entry-card.password {
+        border-left-color: #48bb78;
+    }
+
+    .entry-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+    }
+
+    .entry-service {
+        font-weight: 600;
+        font-size: 1.1rem;
+        color: #2d3748;
+    }
+
+    .entry-type {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        background: #edf2f7;
+        color: #2d3748;
+    }
+
+    .entry-type.api-key {
+        background: #bee3f8;
+        color: #2c5282;
+    }
+
+    .entry-actions {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .entry-body {
+        margin-bottom: 1rem;
+    }
+
+    .entry-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 0.5rem;
+        font-size: 0.95rem;
+    }
+
+    .entry-label {
+        color: #718096;
+        font-weight: 500;
+    }
+
+    .entry-value {
+        color: #2d3748;
+        font-family: 'Courier New', monospace;
+    }
+
+    .entry-value.masked {
+        color: #cbd5e0;
+    }
+
+    .password-masked {
+        letter-spacing: 4px;
+    }
+
+    .btn-small-action {
+        padding: 6px 12px;
+        font-size: 0.875rem;
+        margin-right: 0.5rem;
+    }
+
+    .form-row-items {
+        display: grid;
+        grid-template-columns: 1fr 150px;
+        gap: 0.5rem;
+        align-items: flex-end;
+    }
+
+    .password-strength {
+        display: inline-block;
+        margin-left: 1rem;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+
+    .strength-weak {
+        background: #fed7d7;
+        color: #742a2a;
+    }
+
+    .strength-medium {
+        background: #feebc8;
+        color: #7c2d12;
+    }
+
+    .strength-strong {
+        background: #c6f6d5;
+        color: #22543d;
+    }
+
+    .no-entries {
+        background: white;
+        padding: 2rem;
+        border-radius: 8px;
+        text-align: center;
+        color: #718096;
+    }
+
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.7);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+        padding: 20px;
+    }
+
+    .modal-overlay.active {
+        display: flex;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 8px;
+        padding: 2rem;
+        max-width: 500px;
+        width: 100%;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    }
+
+    .modal-close {
+        float: right;
+        font-size: 2rem;
+        cursor: pointer;
+        color: #718096;
+        background: none;
+        border: none;
+    }
+
+    .modal-close:hover {
+        color: #2d3748;
+    }
+
+    @media (max-width: 768px) {
+        .search-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .metrics-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .form-row-items {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-body">
+    <!-- Navbar -->
+    <div class="navbar">
+        <div class="navbar-brand">🔐 Password Manager</div>
+        <div class="navbar-right">
+            <span class="navbar-user">👤 {{ username }}</span>
+            <a href="{{ url_for('logout') }}" class="btn btn-logout btn-small">Logout</a>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'success' if category == 'success' else 'error' if category == 'error' else 'warning' if category == 'warning' else 'info' }}">
+                        <span>{{ message }}</span>
+                        <button class="alert-close" onclick="this.parentElement.style.display='none';">&times;</button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <h1 class="card-title mb-3">Vault Dashboard</h1>
+
+        <!-- Vault Health Metrics -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-value">{{ total_entries }}</div>
+                <div class="metric-label">Total Entries</div>
+            </div>
+            <div class="metric-card {% if weak_passwords > 0 %}metric-warning{% endif %}">
+                <div class="metric-value">{{ weak_passwords }}</div>
+                <div class="metric-label">Weak Passwords {% if weak_passwords > 0 %}⚠️{% endif %}</div>
+            </div>
+            <div class="metric-card {% if reused_passwords > 0 %}metric-warning{% endif %}">
+                <div class="metric-value">{{ reused_passwords }}</div>
+                <div class="metric-label">Reused Passwords {% if reused_passwords > 0 %}⚠️{% endif %}</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">{{ api_count }}</div>
+                <div class="metric-label">API Keys</div>
+            </div>
+        </div>
+
+        <!-- Search & Filter -->
+        <div class="search-section">
+            <h3 style="margin-bottom: 1rem;">🔍 Search & Filter</h3>
+            <div class="search-grid">
+                <div class="form-group">
+                    <label for="search">Search by service or username</label>
+                    <input type="text" id="search" placeholder="Type to search...">
+                </div>
+                <div class="form-group">
+                    <label for="filter">Filter by type</label>
+                    <select id="filter">
+                        <option value="all">All Types</option>
+                        <option value="password">Password</option>
+                        <option value="api_key">API Key</option>
+                    </select>
+                </div>
+            </div>
+            <div style="margin-top: 1rem; color: #718096;">
+                <span id="entries-count">{{ entries|length }}</span> entries found
+            </div>
+        </div>
+
+        <!-- Add New Entry Form -->
+        <div class="expandable-section">
+            <div class="expandable-header" onclick="toggleExpandable(this)">
+                <span>➕ Add New Entry</span>
+                <span style="font-size: 1.5rem;">▼</span>
+            </div>
+            <div class="expandable-content">
+                <form method="POST" action="{{ url_for('add_entry') }}">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="add_service">Service Name</label>
+                            <input type="text" id="add_service" name="service" required placeholder="e.g., Gmail, GitHub">
+                        </div>
+                        <div class="form-group">
+                            <label for="add_type">Entry Type</label>
+                            <select id="add_type" name="type" required>
+                                {% for type in valid_types %}
+                                    <option value="{{ type }}">{{ type|capitalize }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="add_username">Username/Email</label>
+                        <input type="text" id="add_username" name="username" required placeholder="Enter username or email">
+                    </div>
+
+                    <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
+                        <div style="flex: 1;">
+                            <div class="form-group">
+                                <label for="add_password">Password</label>
+                                <input type="password" id="add_password" name="password" required placeholder="Enter password">
+                            </div>
+                        </div>
+                        <button type="button" onclick="generatePassword()" class="btn btn-secondary btn-small" style="margin-bottom: 0;">Generate</button>
+                    </div>
+
+                    <div id="password-strength-add" style="margin-bottom: 1rem;"></div>
+
+                    <button type="submit" class="btn btn-primary">Add Entry</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Vault Entries -->
+        <div>
+            <h3 style="margin-bottom: 1rem;">📋 Your Credentials</h3>
+            <div id="entries-container">
+                {% if not entries %}
+                    <div class="no-entries">
+                        <p>No credentials stored yet. Add your first entry above!</p>
+                    </div>
+                {% else %}
+                    {% for entry in entries %}
+                        <div class="entry-card {% if entry[4] == 'api_key' %}api-key{% else %}password{% endif %}" data-entry-id="{{ entry[0] }}" data-service="{{ entry[1]|lower }}" data-username="{{ entry[2]|lower }}" data-type="{{ entry[4] }}">
+                            <div class="entry-header">
+                                <div>
+                                    <div class="entry-service">{{ entry[1] }}</div>
+                                    <span class="entry-type {% if entry[4] == 'api_key' %}api-key{% endif %}">{{ entry[4]|replace('_', ' ')|capitalize }}</span>
+                                </div>
+                                <div class="entry-actions">
+                                    <button onclick="revealPassword({{ entry[0] }}, this)" class="btn btn-small btn-small-action" style="background: #667eea; color: white; border: none; cursor: pointer;">Reveal</button>
+                                    <button onclick="editEntry({{ entry[0] }}, '{{ entry[1] }}', '{{ entry[2] }}', '{{ entry[3] }}', '{{ entry[4] }}')" class="btn btn-small btn-small-action" style="background: #4299e1; color: white; border: none; cursor: pointer;">✏️ Edit</button>
+                                    <button onclick="deleteEntry({{ entry[0] }}, '{{ entry[1] }}')" class="btn btn-small btn-small-action" style="background: #f56565; color: white; border: none; cursor: pointer;">🗑️ Delete</button>
+                                </div>
+                            </div>
+                            <div class="entry-body">
+                                <div class="entry-row">
+                                    <span class="entry-label">Username:</span>
+                                    <span class="entry-value">{{ entry[2] }}</span>
+                                </div>
+                                <div class="entry-row">
+                                    <span class="entry-label">Password:</span>
+                                    <span class="entry-value masked password-masked" data-password="{{ entry[3] }}">••••••••</span>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="edit-modal" class="modal-overlay">
+    <div class="modal-content">
+        <button class="modal-close" onclick="closeModal('edit-modal')">&times;</button>
+        <h2 style="margin-bottom: 1.5rem;">Edit Entry</h2>
+        <form id="edit-form" method="POST">
+            <div class="form-group">
+                <label for="edit_service">Service Name</label>
+                <input type="text" id="edit_service" name="service" required>
+            </div>
+            <div class="form-group">
+                <label for="edit_type">Entry Type</label>
+                <select id="edit_type" name="type" required>
+                    {% for type in valid_types %}
+                        <option value="{{ type }}">{{ type|capitalize }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="edit_username">Username/Email</label>
+                <input type="text" id="edit_username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="edit_password">Password</label>
+                <input type="password" id="edit_password" name="password" required>
+            </div>
+            <div style="display: flex; gap: 1rem;">
+                <button type="submit" class="btn btn-primary" style="flex: 1;">Save Changes</button>
+                <button type="button" onclick="closeModal('edit-modal')" class="btn btn-secondary" style="flex: 1;">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="delete-modal" class="modal-overlay">
+    <div class="modal-content">
+        <h2 style="margin-bottom: 1.5rem;">Delete Entry</h2>
+        <p style="margin-bottom: 2rem; color: #718096;">Are you sure you want to delete <strong id="delete-service-name"></strong>? This action cannot be undone.</p>
+        <form id="delete-form" method="POST" style="display: flex; gap: 1rem;">
+            <button type="submit" class="btn btn-danger" style="flex: 1;">Confirm Delete</button>
+            <button type="button" onclick="closeModal('delete-modal')" class="btn btn-secondary" style="flex: 1;">Cancel</button>
+        </form>
+    </div>
+</div>
+
+<script>
+    // Toggle expandable sections
+    function toggleExpandable(header) {
+        const content = header.nextElementSibling;
+        content.classList.toggle('active');
+        header.querySelector('span:last-child').style.transform = content.classList.contains('active') ? 'rotate(180deg)' : 'rotate(0deg)';
+    }
+
+    // Search and filter functionality
+    document.getElementById('search').addEventListener('input', filterEntries);
+    document.getElementById('filter').addEventListener('change', filterEntries);
+
+    function filterEntries() {
+        const search = document.getElementById('search').value.toLowerCase();
+        const filter = document.getElementById('filter').value;
+        const entries = document.querySelectorAll('.entry-card');
+        let count = 0;
+
+        entries.forEach(entry => {
+            const service = entry.dataset.service;
+            const username = entry.dataset.username;
+            const type = entry.dataset.type;
+
+            const matchesSearch = !search || service.includes(search) || username.includes(search);
+            const matchesType = filter === 'all' || type === filter;
+
+            if (matchesSearch && matchesType) {
+                entry.style.display = '';
+                count++;
+            } else {
+                entry.style.display = 'none';
+            }
+        });
+
+        document.getElementById('entries-count').textContent = count;
+    }
+
+    // Reveal/hide password
+    function revealPassword(entryId, button) {
+        const entry = document.querySelector(`[data-entry-id="${entryId}"]`);
+        const passwordField = entry.querySelector('.password-masked');
+        const isRevealed = passwordField.textContent !== '••••••••';
+
+        if (isRevealed) {
+            passwordField.textContent = '••••••••';
+            button.textContent = 'Reveal';
+        } else {
+            passwordField.textContent = passwordField.dataset.password;
+            button.textContent = 'Hide';
+        }
+    }
+
+    // Generate password
+    function generatePassword() {
+        fetch('/api/generate-password')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('add_password').value = data.password;
+                checkPasswordStrength('add_password', 'password-strength-add');
+            });
+    }
+
+    // Check password strength
+    function checkPasswordStrength(inputId, outputId) {
+        const password = document.getElementById(inputId).value;
+        if (!password) return;
+
+        fetch(`/api/password-strength/${encodeURIComponent(password)}`)
+            .then(response => response.json())
+            .then(data => {
+                const output = document.getElementById(outputId);
+                const strength = data.strength.toLowerCase();
+                let className = 'strength-weak';
+                if (strength.includes('strong')) className = 'strength-strong';
+                else if (strength.includes('medium')) className = 'strength-medium';
+
+                output.innerHTML = `<span class="password-strength ${className}">${data.strength}</span>`;
+            });
+    }
+
+    document.getElementById('add_password').addEventListener('input', () => checkPasswordStrength('add_password', 'password-strength-add'));
+
+    // Edit entry
+    function editEntry(entryId, service, username, password, type) {
+        document.getElementById('edit_service').value = service;
+        document.getElementById('edit_username').value = username;
+        document.getElementById('edit_password').value = password;
+        document.getElementById('edit_type').value = type;
+        document.getElementById('edit-form').action = `/edit-entry/${entryId}`;
+        document.getElementById('edit-modal').classList.add('active');
+    }
+
+    // Delete entry
+    function deleteEntry(entryId, serviceName) {
+        document.getElementById('delete-service-name').textContent = serviceName;
+        document.getElementById('delete-form').action = `/delete-entry/${entryId}`;
+        document.getElementById('delete-modal').classList.add('active');
+    }
+
+    // Close modal
+    function closeModal(modalId) {
+        document.getElementById(modalId).classList.remove('active');
+    }
+
+    // Close modal when clicking outside
+    document.querySelectorAll('.modal-overlay').forEach(modal => {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.remove('active');
+            }
+        });
+    });
+</script>
+{% endblock %}

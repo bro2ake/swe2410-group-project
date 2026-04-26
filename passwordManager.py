@@ -1,6 +1,9 @@
 from databaseConnect import DatabaseManager
 import passwordGenerator
 
+# Valid entry types for the password vault
+VALID_ENTRY_TYPES = ["password", "api_key"]
+
 class PasswordManager:
     '''
     Manages password vault entries for a specific logged-in user.
