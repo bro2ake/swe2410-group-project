@@ -25,6 +25,7 @@ class DatabaseManager:
             service TEXT,
             username TEXT,
             password TEXT,
+            entry_type TEXT DEFAULT 'password',
             FOREIGN KEY(owner_username) REFERENCES users(username)
         )
         """
@@ -50,17 +51,17 @@ class DatabaseManager:
         result = cursor.fetchone()
         return result[0] if result else None
 
-    def add_password_entry(self, owner_username, service, username, password):
-        query = "INSERT INTO passwords (owner_username, service, username, password) VALUES (?, ?, ?, ?)"
-        self._execute_query(query, (owner_username, service, username, password))
+    def add_password_entry(self, owner_username, service, username, password, entry_type="password"):
+        query = "INSERT INTO passwords (owner_username, service, username, password, entry_type) VALUES (?, ?, ?, ?, ?)"
+        self._execute_query(query, (owner_username, service, username, password, entry_type))
         return True
 
     def get_password_entries(self, owner_username):
-        query = "SELECT id, service, username, password FROM passwords WHERE owner_username = ?"
+        query = "SELECT id, service, username, password, entry_type FROM passwords WHERE owner_username = ?"
         cursor = self._execute_query(query, (owner_username,))
         return cursor.fetchall()
 
-    def update_password_entry(self, entry_id, owner_username, service, username, password):
+    def update_password_entry(self, entry_id, owner_username, service, username, password, entry_type=None): #If the user does not change the entry type it stays as password
         query = "UPDATE passwords SET service = ?, username = ?, password = ? WHERE id = ? AND owner_username = ?"
         self._execute_query(query, (service, username, password, entry_id, owner_username))
         return True
