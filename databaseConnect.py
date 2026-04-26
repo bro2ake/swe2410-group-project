@@ -30,6 +30,18 @@ class DatabaseManager:
         )
         """
         self._execute_query(query_passwords)
+
+        # README! Might need to add this to sync to the db
+        #def _migrate_table(self):
+        #'''
+        #Adds the entry_type column to existing databases that were created
+        #before this column existed. Safe to run on new databases too —
+       # the exception is silently ignored if the column is already present.
+       # '''
+        #try:
+            #self._execute_query("ALTER TABLE passwords ADD COLUMN entry_type TEXT DEFAULT 'password'")
+        #except sqlite3.OperationalError:
+            #pass  # Column already exists, nothing to do
         
     def _execute_query(self, query, params=()):
         cursor = self.conn.cursor()
