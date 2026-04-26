@@ -55,7 +55,7 @@
 
     .search-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr 1fr 1fr;
         gap: 1rem;
     }
 
@@ -137,6 +137,17 @@
         color: #2c5282;
     }
 
+    .entry-group {
+        display: inline-block;
+        margin-left: 0.5rem;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        background: #e9d8fd;
+        color: #553c9a;
+    }
+
     .entry-actions {
         display: flex;
         gap: 0.5rem;
@@ -182,6 +193,16 @@
         grid-template-columns: 1fr 150px;
         gap: 0.5rem;
         align-items: flex-end;
+    }
+
+    .expandable-content .form-row {
+        grid-template-columns: 1fr 1fr 1fr;
+    }
+
+    @media (max-width: 768px) {
+        .expandable-content .form-row {
+            grid-template-columns: 1fr;
+        }
     }
 
     .password-strength {
@@ -254,6 +275,12 @@
 
     .modal-close:hover {
         color: #2d3748;
+    }
+
+    @media (max-width: 900px) {
+        .search-grid {
+            grid-template-columns: 1fr 1fr;
+        }
     }
 
     @media (max-width: 768px) {
@@ -334,6 +361,15 @@
                         <option value="api_key">API Key</option>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label for="filter-group">Filter by group</label>
+                    <select id="filter-group">
+                        <option value="all">All Groups</option>
+                        {% for g in valid_groups %}
+                        <option value="{{ g }}">{{ g|capitalize }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
             <div style="margin-top: 1rem; color: #718096;">
                 <span id="entries-count">{{ entries|length }}</span> entries found
@@ -358,6 +394,14 @@
                             <select id="add_type" name="type" required>
                                 {% for type in valid_types %}
                                     <option value="{{ type }}">{{ type|capitalize }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="add_group">Group</label>
+                            <select id="add_group" name="group" required>
+                                {% for g in valid_groups %}
+                                    <option value="{{ g }}">{{ g|capitalize }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -395,15 +439,16 @@
                     </div>
                 {% else %}
                     {% for entry in entries %}
-                        <div class="entry-card {% if entry[4] == 'api_key' %}api-key{% else %}password{% endif %}" data-entry-id="{{ entry[0] }}" data-service="{{ entry[1]|lower }}" data-username="{{ entry[2]|lower }}" data-type="{{ entry[4] }}">
+                        <div class="entry-card {% if entry[4] == 'api_key' %}api-key{% else %}password{% endif %}" data-entry-id="{{ entry[0] }}" data-service="{{ entry[1]|lower }}" data-username="{{ entry[2]|lower }}" data-type="{{ entry[4] }}" data-group="{{ entry[5] or 'other' }}">
                             <div class="entry-header">
                                 <div>
                                     <div class="entry-service">{{ entry[1] }}</div>
                                     <span class="entry-type {% if entry[4] == 'api_key' %}api-key{% endif %}">{{ entry[4]|replace('_', ' ')|capitalize }}</span>
+                                    <span class="entry-group">{{ (entry[5] or 'other')|replace('_', ' ')|capitalize }}</span>
                                 </div>
                                 <div class="entry-actions">
                                     <button onclick="revealPassword({{ entry[0] }}, this)" class="btn btn-small btn-small-action" style="background: #667eea; color: white; border: none; cursor: pointer;">Reveal</button>
-                                    <button onclick="editEntry({{ entry[0] }}, '{{ entry[1] }}', '{{ entry[2] }}', '{{ entry[3] }}', '{{ entry[4] }}')" class="btn btn-small btn-small-action" style="background: #4299e1; color: white; border: none; cursor: pointer;">✏️ Edit</button>
+                                    <button onclick="editEntry({{ entry[0] }}, {{ entry[1] | tojson }}, {{ entry[2] | tojson }}, {{ entry[3] | tojson }}, {{ entry[4] | tojson }}, {{ (entry[5] or 'other') | tojson }})" class="btn btn-small btn-small-action" style="background: #4299e1; color: white; border: none; cursor: pointer;">✏️ Edit</button>
                                     <button onclick="deleteEntry({{ entry[0] }}, '{{ entry[1] }}')" class="btn btn-small btn-small-action" style="background: #f56565; color: white; border: none; cursor: pointer;">🗑️ Delete</button>
                                 </div>
                             </div>
@@ -440,6 +485,14 @@
                 <select id="edit_type" name="type" required>
                     {% for type in valid_types %}
                         <option value="{{ type }}">{{ type|capitalize }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="edit_group">Group</label>
+                <select id="edit_group" name="group" required>
+                    {% for g in valid_groups %}
+                        <option value="{{ g }}">{{ g|capitalize }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -482,10 +535,12 @@
     // Search and filter functionality
     document.getElementById('search').addEventListener('input', filterEntries);
     document.getElementById('filter').addEventListener('change', filterEntries);
+    document.getElementById('filter-group').addEventListener('change', filterEntries);
 
     function filterEntries() {
         const search = document.getElementById('search').value.toLowerCase();
         const filter = document.getElementById('filter').value;
+        const filterGroup = document.getElementById('filter-group').value;
         const entries = document.querySelectorAll('.entry-card');
         let count = 0;
 
@@ -493,11 +548,13 @@
             const service = entry.dataset.service;
             const username = entry.dataset.username;
             const type = entry.dataset.type;
+            const group = (entry.dataset.group || 'other');
 
             const matchesSearch = !search || service.includes(search) || username.includes(search);
             const matchesType = filter === 'all' || type === filter;
+            const matchesGroup = filterGroup === 'all' || group === filterGroup;
 
-            if (matchesSearch && matchesType) {
+            if (matchesSearch && matchesType && matchesGroup) {
                 entry.style.display = '';
                 count++;
             } else {
@@ -554,11 +611,12 @@
     document.getElementById('add_password').addEventListener('input', () => checkPasswordStrength('add_password', 'password-strength-add'));
 
     // Edit entry
-    function editEntry(entryId, service, username, password, type) {
+    function editEntry(entryId, service, username, password, type, group) {
         document.getElementById('edit_service').value = service;
         document.getElementById('edit_username').value = username;
         document.getElementById('edit_password').value = password;
         document.getElementById('edit_type').value = type;
+        document.getElementById('edit_group').value = group || 'other';
         document.getElementById('edit-form').action = `/edit-entry/${entryId}`;
         document.getElementById('edit-modal').classList.add('active');
     }

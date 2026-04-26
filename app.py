@@ -17,6 +17,8 @@ app.secret_key = os.urandom(24)  # Generate random secret key for sessions
 
 # Valid entry types for password vault
 VALID_ENTRY_TYPES = ["password", "api_key"]
+# Work / Personal / Social organization
+VALID_GROUPS = ["work", "personal", "social", "other"]
 
 
 # ============================================================================
@@ -158,7 +160,8 @@ def dashboard():
                          weak_passwords=weak_passwords,
                          reused_passwords=reused_passwords,
                          api_count=api_count,
-                         valid_types=VALID_ENTRY_TYPES)
+                         valid_types=VALID_ENTRY_TYPES,
+                         valid_groups=VALID_GROUPS)
 
 
 @app.route('/api/entries', methods=['GET'])
@@ -170,12 +173,16 @@ def get_entries():
     
     search_query = request.args.get('search', '').lower()
     filter_type = request.args.get('type', 'all')
+    filter_group = request.args.get('group', 'all')
     
     entries = pm.view_entries()
     
     # Apply filters
     if filter_type != 'all':
         entries = [e for e in entries if e[4] == filter_type]
+
+    if filter_group != 'all' and filter_group in VALID_GROUPS:
+        entries = [e for e in entries if (e[5] or 'other') == filter_group]
     
     if search_query:
         entries = [
@@ -190,7 +197,8 @@ def get_entries():
             'service': e[1],
             'username': e[2],
             'password': e[3],
-            'type': e[4]
+            'type': e[4],
+            'group': e[5] if len(e) > 5 and e[5] else 'other'
         }
         for e in entries
     ]
@@ -209,6 +217,7 @@ def add_entry():
     username_cred = request.form.get('username', '').strip()
     password = request.form.get('password', '').strip()
     entry_type = request.form.get('type', 'password')
+    group_name = request.form.get('group', 'other').strip() or 'other'
     
     if not all([service, username_cred, password]):
         flash('All fields are required.', 'error')
@@ -217,8 +226,12 @@ def add_entry():
     if entry_type not in VALID_ENTRY_TYPES:
         flash('Invalid entry type.', 'error')
         return redirect(url_for('dashboard'))
+
+    if group_name not in VALID_GROUPS:
+        flash('Invalid group.', 'error')
+        return redirect(url_for('dashboard'))
     
-    success = pm.create_entry(service, username_cred, password, entry_type)
+    success = pm.create_entry(service, username_cred, password, entry_type, group_name)
     
     if success:
         flash(f'✅ Entry added for {service}!', 'success')
@@ -239,6 +252,7 @@ def edit_entry(entry_id):
     username_cred = request.form.get('username', '').strip()
     password = request.form.get('password', '').strip()
     entry_type = request.form.get('type', 'password')
+    group_name = request.form.get('group', 'other').strip() or 'other'
     
     if not all([service, username_cred, password]):
         flash('All fields are required.', 'error')
@@ -247,8 +261,12 @@ def edit_entry(entry_id):
     if entry_type not in VALID_ENTRY_TYPES:
         flash('Invalid entry type.', 'error')
         return redirect(url_for('dashboard'))
+
+    if group_name not in VALID_GROUPS:
+        flash('Invalid group.', 'error')
+        return redirect(url_for('dashboard'))
     
-    success = pm.update_entry(entry_id, service, username_cred, password, entry_type)
+    success = pm.update_entry(entry_id, service, username_cred, password, entry_type, group_name)
     
     if success:
         flash(f'✅ Entry updated for {service}!', 'success')

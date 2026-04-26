@@ -26,6 +26,7 @@ class DatabaseManager:
             username TEXT,
             password TEXT,
             entry_type TEXT DEFAULT 'password',
+            group_name TEXT DEFAULT 'other',
             FOREIGN KEY(owner_username) REFERENCES users(username)
         )
         """
@@ -44,7 +45,12 @@ class DatabaseManager:
             self._execute_query("ALTER TABLE passwords ADD COLUMN entry_type TEXT DEFAULT 'password'")
         except sqlite3.OperationalError:
             pass  # Column already exists, nothing to do
-        
+
+        try:
+            self._execute_query("ALTER TABLE passwords ADD COLUMN group_name TEXT DEFAULT 'other'")
+        except sqlite3.OperationalError:
+            pass  # Column already exists, nothing to do
+
     def _execute_query(self, query, params=()):
         cursor = self.conn.cursor()
         cursor.execute(query, params)
@@ -65,19 +71,19 @@ class DatabaseManager:
         result = cursor.fetchone()
         return result[0] if result else None
 
-    def add_password_entry(self, owner_username, service, username, password, entry_type="password"):
-        query = "INSERT INTO passwords (owner_username, service, username, password, entry_type) VALUES (?, ?, ?, ?, ?)"
-        self._execute_query(query, (owner_username, service, username, password, entry_type))
+    def add_password_entry(self, owner_username, service, username, password, entry_type="password", group_name="other"):
+        query = "INSERT INTO passwords (owner_username, service, username, password, entry_type, group_name) VALUES (?, ?, ?, ?, ?, ?)"
+        self._execute_query(query, (owner_username, service, username, password, entry_type, group_name))
         return True
 
     def get_password_entries(self, owner_username):
-        query = "SELECT id, service, username, password, entry_type FROM passwords WHERE owner_username = ?"
+        query = "SELECT id, service, username, password, entry_type, group_name FROM passwords WHERE owner_username = ?"
         cursor = self._execute_query(query, (owner_username,))
         return cursor.fetchall()
 
-    def update_password_entry(self, entry_id, owner_username, service, username, password, entry_type="password"):
-        query = "UPDATE passwords SET service = ?, username = ?, password = ?, entry_type = ? WHERE id = ? AND owner_username = ?"
-        self._execute_query(query, (service, username, password, entry_type, entry_id, owner_username))
+    def update_password_entry(self, entry_id, owner_username, service, username, password, entry_type="password", group_name="other"):
+        query = "UPDATE passwords SET service = ?, username = ?, password = ?, entry_type = ?, group_name = ? WHERE id = ? AND owner_username = ?"
+        self._execute_query(query, (service, username, password, entry_type, group_name, entry_id, owner_username))
         return True
 
     def delete_password_entry(self, entry_id, owner_username):

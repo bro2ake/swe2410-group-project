@@ -3,6 +3,8 @@ import passwordGenerator
 
 # Valid entry types for the password vault
 VALID_ENTRY_TYPES = ["password", "api_key"]
+# Work / Personal / Social (plus Other)
+VALID_GROUP_NAMES = ["work", "personal", "social", "other"]
 
 class PasswordManager:
     '''
@@ -13,21 +15,25 @@ class PasswordManager:
         self.username = logged_in_username
         self.db = DatabaseManager()
 
-    def create_entry(self, service, username, password, entry_type="password"):
+    def create_entry(self, service, username, password, entry_type="password", group_name="other"):
         if entry_type not in VALID_ENTRY_TYPES:
             print(f"Invalid entry type '{entry_type}'. Must be one of: {VALID_ENTRY_TYPES}")
             return False
-        if self.db.add_password_entry(self.username, service, username, password, entry_type):
+        if group_name not in VALID_GROUP_NAMES:
+            print(f"Invalid group '{group_name}'. Must be one of: {VALID_GROUP_NAMES}")
+            return False
+        if self.db.add_password_entry(self.username, service, username, password, entry_type, group_name):
             print(f"Successfully added password {entry_type} entry for {service}.")
             return True
         return False
 
-    def view_entries(self, filter_type=None):
-        # Returns all entries. User cal also filter by entry_type
-        #Filter types = "password", "api_key" or None
+    def view_entries(self, filter_type=None, filter_group=None):
+        # Returns all entries. Optional filters: entry_type ("password", "api_key") and/or group
         entries = self.db.get_password_entries(self.username)
         if filter_type:
             entries = [e for e in entries if e[4] == filter_type]
+        if filter_group:
+            entries = [e for e in entries if e[5] == filter_group]
         return entries
 
     def _print_entries(self, entries):
@@ -37,17 +43,23 @@ class PasswordManager:
 
         print("\n--- Saved Passwords ---")
         for entry in entries:
-            entry_id, service, entry_user, entry_pass, entry_type = entry
+            entry_id, service, entry_user, entry_pass, entry_type, group_name = entry
             label = "API Key" if entry_type == "api_key" else "Password"
-            print(f"ID: {entry_id} | [{label}] | Service: {service} | Username: {entry_user} | Password: {entry_pass}")
+            g = group_name or "other"
+            print(f"ID: {entry_id} | [{label}] | [{g}] | Service: {service} | Username: {entry_user} | Password: {entry_pass}")
         print("-----------------------")
 
-    def update_entry(self, entry_id, new_service, new_username, new_password, new_entry_type=None):
-        # new_entry_type lets user change the type tag. Passes None to leave it unchanged
-        if new_entry_type is not None and new_entry_type not in VALID_ENTRY_TYPES:
-            print(f"Invalid entry type ' {new_entry_type}'. Must be one of: {VALID_ENTRY_TYPES}")
+    def update_entry(self, entry_id, new_service, new_username, new_password, new_entry_type=None, new_group_name=None):
+        # new_entry_type / new_group_name: pass None to use defaults (password / other) for non-Flask paths
+        et = new_entry_type if new_entry_type is not None else "password"
+        gn = new_group_name if new_group_name is not None else "other"
+        if et not in VALID_ENTRY_TYPES:
+            print(f"Invalid entry type ' {et}'. Must be one of: {VALID_ENTRY_TYPES}")
             return False
-        if self.db.update_password_entry(entry_id, self.username, new_service, new_username, new_password):
+        if gn not in VALID_GROUP_NAMES:
+            print(f"Invalid group '{gn}'. Must be one of: {VALID_GROUP_NAMES}")
+            return False
+        if self.db.update_password_entry(entry_id, self.username, new_service, new_username, new_password, et, gn):
             print(f"Successfully updated entry ID {entry_id}.")
             return True
         return False
@@ -136,11 +148,17 @@ class PasswordManager:
                 entries = self.view_entries()
                 self._print_entries(entries)
                 if entries:
-                    entry_id = input("Enter the ID of the entry to edit: ")
+                    entry_id_str = input("Enter the ID of the entry to edit: ").strip()
                     service = input("New Service/Website: ")
                     username = input("New Username/Email: ")
                     password = input("New Password: ")
-                    self.update_entry(entry_id, service, username, password)
+                    match = next((e for e in entries if str(e[0]) == entry_id_str), None)
+                    if match:
+                        self.update_entry(
+                            int(match[0]), service, username, password, match[4], match[5] if len(match) > 5 and match[5] else "other"
+                        )
+                    else:
+                        print("No entry with that ID.")
             elif choice == '4':
                 entries = self.view_entries()
                 self._print_entries(entries)

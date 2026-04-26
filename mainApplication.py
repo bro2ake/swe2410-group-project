@@ -362,8 +362,10 @@ class EditPasswordFrame(tk.Frame):
         entry_id = entry_to_edit[0]
         service = entry_to_edit[1]
         username = entry_to_edit[2]
+        entry_type = entry_to_edit[4] if len(entry_to_edit) > 4 else "password"
+        group_name = entry_to_edit[5] if len(entry_to_edit) > 5 else "other"
 
-        if manager.update_entry(entry_id, service, username, new_password):
+        if manager.update_entry(entry_id, service, username, new_password, entry_type, group_name):
             messagebox.showinfo("Success", "Password updated successfully!")
             self.cancel()
         else:
