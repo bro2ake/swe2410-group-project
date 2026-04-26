@@ -10,14 +10,21 @@ class PasswordManager:
         self.username = logged_in_username
         self.db = DatabaseManager()
 
-    def create_entry(self, service, username, password):
-        if self.db.add_password_entry(self.username, service, username, password):
-            print(f"Successfully added password entry for {service}.")
+    def create_entry(self, service, username, password, entry_type="password"):
+        if entry_type not in VALID_ENTRY_TYPES:
+            print(f"Invalid entry type '{entry_type}'. Must be one of: {VALID_ENTRY_TYPES}")
+            return False
+        if self.db.add_password_entry(self.username, service, username, password, entry_type):
+            print(f"Successfully added password {entry_type} entry for {service}.")
             return True
         return False
 
-    def view_entries(self):
+    def view_entries(self, filter_type=None):
+        # Returns all entries. User cal also filter by entry_type
+        #Filter types = "password", "api_key" or None
         entries = self.db.get_password_entries(self.username)
+        if filter_type:
+            entries = [e for e in entries if e[4] == filter_type]
         return entries
 
     def _print_entries(self, entries):
@@ -27,11 +34,16 @@ class PasswordManager:
 
         print("\n--- Saved Passwords ---")
         for entry in entries:
-            entry_id, service, entry_user, entry_pass = entry
-            print(f"ID: {entry_id} | Service: {service} | Username: {entry_user} | Password: {entry_pass}")
+            entry_id, service, entry_user, entry_pass, entry_type = entry
+            label = "API Key" if entry_type == "api_key" else "Password"
+            print(f"ID: {entry_id} | [{label}] | Service: {service} | Username: {entry_user} | Password: {entry_pass}")
         print("-----------------------")
 
-    def update_entry(self, entry_id, new_service, new_username, new_password):
+    def update_entry(self, entry_id, new_service, new_username, new_password, new_entry_type=None):
+        # new_entry_type lets user change the type tag. Passes None to leave it unchanged
+        if new_entry_type is not None and new_entry_type not in VALID_ENTRY_TYPES:
+            print(f"Invalid entry type ' {new_entry_type}'. Must be one of: {VALID_ENTRY_TYPES}")
+            return False
         if self.db.update_password_entry(entry_id, self.username, new_service, new_username, new_password):
             print(f"Successfully updated entry ID {entry_id}.")
             return True
@@ -42,6 +54,19 @@ class PasswordManager:
             print(f"Successfully deleted entry ID {entry_id}.")
             return True
         return False
+        
+    def _prompt_entry_type(self):
+        while True:
+            print("Entry type:")
+            print("    1. Password")
+            print("    2. API Key")
+            choice = input("Select type (1-2): ")
+            if choice == '1':
+                return "password"
+            elif choice == '2':
+                return "api_key"
+            else:
+                print("Invalid selection, please enter 1 or 2.")
     
     # Valut health menu 
     def vault_health(self):
@@ -68,6 +93,7 @@ class PasswordManager:
             "reused_passwords": reused_count
         }
 
+    # May need to change to allow filtering by type
     def vault_menu(self):
         while True:
             print(f"\n=== Vault for {self.username} ===")
