@@ -440,7 +440,7 @@
                     </div>
                 {% else %}
                     {% for entry in entries %}
-                        <div class="entry-card {% if entry[4] == 'api_key' %}api-key{% else %}password{% endif %}" data-entry-id="{{ entry[0] }}" data-service="{{ entry[1]|lower }}" data-username="{{ entry[2]|lower }}" data-type="{{ entry[4] }}" data-group="{{ entry[5] or 'other' }}">
+                        <div class="entry-card {% if entry[4] == 'api_key' %}api-key{% else %}password{% endif %}" data-entry-id="{{ entry[0] }}" data-service="{{ entry[1]|lower }}" data-username="{{ entry[2]|lower }}" data-service-raw="{{ entry[1]|e }}" data-username-raw="{{ entry[2]|e }}" data-type="{{ entry[4] }}" data-group="{{ entry[5] or 'other' }}">
                             <div class="entry-header">
                                 <div>
                                     <div class="entry-service">{{ entry[1] }}</div>
@@ -448,10 +448,10 @@
                                     <span class="entry-group">{{ (entry[5] or 'other')|replace('_', ' ')|capitalize }}</span>
                                 </div>
                                 <div class="entry-actions">
-                                    <button type="button" onclick="copyToClipboard({{ entry[2] | tojson }}, this)" class="btn btn-small btn-small-action" style="background: #805ad5; color: white; border: none; cursor: pointer;" title="Copy username to clipboard (browser)">Copy user</button>
+                                    <button type="button" onclick="copyUsernameById({{ entry[0] }}, this)" class="btn btn-small btn-small-action" style="background: #805ad5; color: white; border: none; cursor: pointer;" title="Copy username to clipboard (browser)">Copy user</button>
                                     <button type="button" onclick="copyPasswordToClipboard({{ entry[0] }}, this)" class="btn btn-small btn-small-action" style="background: #38a169; color: white; border: none; cursor: pointer;" title="Copy password to clipboard (browser)">Copy pass</button>
                                     <button onclick="revealPassword({{ entry[0] }}, this)" class="btn btn-small btn-small-action" style="background: #667eea; color: white; border: none; cursor: pointer;">Reveal</button>
-                                    <button onclick="editEntry({{ entry[0] }}, {{ entry[1] | tojson }}, {{ entry[2] | tojson }}, {{ entry[3] | tojson }}, {{ entry[4] | tojson }}, {{ (entry[5] or 'other') | tojson }})" class="btn btn-small btn-small-action" style="background: #4299e1; color: white; border: none; cursor: pointer;">✏️ Edit</button>
+                                    <button onclick="editEntry({{ entry[0] }})" class="btn btn-small btn-small-action" style="background: #4299e1; color: white; border: none; cursor: pointer;">✏️ Edit</button>
                                     <button onclick="deleteEntry({{ entry[0] }}, '{{ entry[1] }}')" class="btn btn-small btn-small-action" style="background: #f56565; color: white; border: none; cursor: pointer;">🗑️ Delete</button>
                                 </div>
                             </div>
@@ -462,7 +462,7 @@
                                 </div>
                                 <div class="entry-row">
                                     <span class="entry-label">Password:</span>
-                                    <span class="entry-value masked password-masked" data-password="{{ entry[3] }}">••••••••</span>
+                                    <span class="entry-value masked password-masked" data-password="{{ entry[3]|e }}">••••••••</span>
                                 </div>
                             </div>
                         </div>
@@ -598,6 +598,13 @@
             .catch(() => { window.prompt('Copy this text:', text); });
     }
 
+    function copyUsernameById(entryId, button) {
+        const card = document.querySelector(`[data-entry-id="${entryId}"]`);
+        if (!card) return;
+        const v = card.dataset.usernameRaw;
+        copyToClipboard(v, button);
+    }
+
     function copyPasswordToClipboard(entryId, button) {
         const card = document.querySelector(`[data-entry-id="${entryId}"]`);
         if (!card) return;
@@ -637,7 +644,15 @@
     document.getElementById('add_password').addEventListener('input', () => checkPasswordStrength('add_password', 'password-strength-add'));
 
     // Edit entry
-    function editEntry(entryId, service, username, password, type, group) {
+    function editEntry(entryId) {
+        const card = document.querySelector(`[data-entry-id="${entryId}"]`);
+        if (!card) return;
+        const service = card.dataset.serviceRaw || card.dataset.service || '';
+        const username = card.dataset.usernameRaw || card.dataset.username || '';
+        const passwordField = card.querySelector('.password-masked');
+        const password = (passwordField && passwordField.dataset.password) || '';
+        const type = card.dataset.type || 'password';
+        const group = card.dataset.group || 'other';
         document.getElementById('edit_service').value = service;
         document.getElementById('edit_username').value = username;
         document.getElementById('edit_password').value = password;
